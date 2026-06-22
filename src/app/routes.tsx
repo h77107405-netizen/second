@@ -64,8 +64,6 @@ const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode;
 
 // Root redirect based on authentication
 const LoginRoute = () => {
-  // clear any existing token when hitting login
-  localStorage.removeItem('token');
   return <LoginPage />;
 };
 
