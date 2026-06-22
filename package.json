@@ -3,7 +3,10 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
- "packageManager": "npm@11.7.0",
+ "packageManager": "pnpm@9.15.9",
+"engines": {
+  "node": "20.x"
+}
   "scripts": {
     "build": "vite build",
     "dev": "concurrently --kill-others \"npm run dev:frontend\" \"npm run dev:backend\"",
