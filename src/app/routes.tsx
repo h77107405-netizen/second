@@ -63,8 +63,10 @@ const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode;
 };
 
 // Root redirect based on authentication
-const RootRedirect = () => {
-  const { user, isAuthenticated } = useAuth();
+const LoginRoute = () => {
+  localStorage.removeItem('token');
+  return <LoginPage />;
+};
 
   if (!isAuthenticated || !user) {
     return <LoginPage />;
@@ -81,11 +83,10 @@ export const router = createBrowserRouter([
     path: '/',
     element: <RootRedirect />,
   },
-
-  {
-    path: '/login',
-    element: <LoginPage />,
-  },
+{
+  path: '/login',
+  element: <LoginRoute />,
+},
 
   // ─── Admin Routes
   {
