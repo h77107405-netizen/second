@@ -154,7 +154,7 @@ export const api = {
     broadcastNotification: (data: any) => request<any>('/admin/notifications/broadcast', { method: 'POST', body: JSON.stringify(data) }),
 
     // Audit Logs (server-side paginated)
-    getAuditLogs: (params?: PaginationParams & { entity?: string }) => request<any>(`/admin/audit-logs${buildQuery(params)}`),
+    getAuditLogs: (params?: PaginationParams & { entity?: string; action?: string; from?: string; to?: string; all?: string }) => request<any>(`/admin/audit-logs${buildQuery(params)}`),
   },
 
   // Teacher

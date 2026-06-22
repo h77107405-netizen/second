@@ -690,20 +690,42 @@ router.post('/notifications/broadcast', asyncHandler(async (req, res) => {
 // ── Audit Logs ─────────────────────────────────────────────────────────────
 router.get('/audit-logs', asyncHandler(async (req, res) => {
   const { page, limit, offset, search, status: entity, order } = parsePagination(req.query, 20);
+  const action = (req.query.action as string || '').trim();
+  const from = req.query.from as string | undefined;
+  const to = req.query.to as string | undefined;
+  const exportAll = req.query.all === 'true';
 
   const conditions: any[] = [];
   if (entity) conditions.push(eq(schema.auditLogs.entity, entity));
+  if (action) conditions.push(eq(schema.auditLogs.action, action));
+  if (from) conditions.push(sql`${schema.auditLogs.createdAt} >= ${new Date(from)}`);
+  if (to) {
+    const toDate = new Date(to);
+    toDate.setHours(23, 59, 59, 999);
+    conditions.push(sql`${schema.auditLogs.createdAt} <= ${toDate}`);
+  }
   if (search) {
     conditions.push(or(
       ilike(schema.auditLogs.action, `%${search}%`),
       ilike(schema.auditLogs.details, `%${search}%`),
+      ilike(schema.users.name, `%${search}%`),
     )!);
   }
   const where = conditions.length ? and(...conditions) : undefined;
 
-  const [{ total }] = await db.select({ total: count() }).from(schema.auditLogs).where(where);
+  const [{ total }] = await db
+    .select({ total: count() })
+    .from(schema.auditLogs)
+    .leftJoin(schema.users, eq(schema.auditLogs.userId, schema.users.id))
+    .where(where);
 
-  const data = await db
+  // Action-level stats for the unfiltered dataset (ignores filters for summary)
+  const actionStats = await db
+    .select({ action: schema.auditLogs.action, total: count() })
+    .from(schema.auditLogs)
+    .groupBy(schema.auditLogs.action);
+
+  const baseQuery = db
     .select({
       id: schema.auditLogs.id, action: schema.auditLogs.action, entity: schema.auditLogs.entity,
       entityId: schema.auditLogs.entityId, details: schema.auditLogs.details,
@@ -713,11 +735,13 @@ router.get('/audit-logs', asyncHandler(async (req, res) => {
     .from(schema.auditLogs)
     .leftJoin(schema.users, eq(schema.auditLogs.userId, schema.users.id))
     .where(where)
-    .orderBy(order === 'asc' ? asc(schema.auditLogs.createdAt) : desc(schema.auditLogs.createdAt))
-    .limit(limit)
-    .offset(offset);
+    .orderBy(order === 'asc' ? asc(schema.auditLogs.createdAt) : desc(schema.auditLogs.createdAt));
 
-  res.json({ success: true, data, pagination: paginationMeta(total, page, limit), total });
+  const data = exportAll
+    ? await baseQuery.limit(5000)
+    : await baseQuery.limit(limit).offset(offset);
+
+  res.json({ success: true, data, pagination: paginationMeta(total, page, limit), total, actionStats });
 }));
 
 export default router;
