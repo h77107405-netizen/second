@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { AuthContextType, User } from '../types/auth';
-import { api } from '../lib/api';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { api } from '../lib/api';
+import { clearAuthStorage, getStoredAuthSnapshot, persistAuthState } from '../lib/auth';
+import { AuthContextType, User } from '../types/auth';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -18,48 +19,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const cached = localStorage.getItem('user');
-        if (cached) {
-          try {
-            setUser(JSON.parse(cached) as User);
-          } catch {
-            localStorage.removeItem('user');
+        const { token, user: cachedUser } = getStoredAuthSnapshot();
+        if (cachedUser) {
+          setUser(cachedUser);
+        }
+
+        if (!token) {
+          clearAuthStorage();
+          setUser(null);
+          return;
+        }
+
+        let res = await api.auth.me();
+        if (res.success && res.data) {
+          const nextUser = res.data as User;
+          persistAuthState(token, nextUser);
+          setUser(nextUser);
+        } else {
+          const refreshed = await api.auth.refresh();
+          if (refreshed.success && refreshed.token) {
+            persistAuthState(refreshed.token, cachedUser || (await api.auth.me()).data as User);
+            const fresh = (await api.auth.me()).data as User;
+            setUser(fresh);
+          } else {
+            clearAuthStorage();
+            setUser(null);
           }
         }
-
-        if (!token) return;
-
-        const res = await api.auth.me();
-        if (res.success && res.data) {
-          setUser(res.data as User);
-          localStorage.setItem('user', JSON.stringify(res.data));
-        } else {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          setUser(null);
-        }
       } catch {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        clearAuthStorage();
         setUser(null);
       } finally {
         setIsLoading(false);
       }
     };
-    checkSession();
+
+    void checkSession();
   }, []);
 
   const login = async (email: string, password: string) => {
+    if (isLoading) return undefined;
+
     setIsLoading(true);
     try {
       const res = await api.auth.login(email, password);
-      localStorage.setItem('token', res.token);
-      localStorage.setItem('user', JSON.stringify(res.user));
-      setUser(res.user as User);
-      toast.success(`Welcome back, ${res.user.name}!`);
-      return res.user as User;
+      const nextUser = res.user as User;
+      persistAuthState(res.token, nextUser, res.refreshToken);
+      setUser(nextUser);
+      toast.success(`Welcome back, ${nextUser.name}!`);
+      return nextUser;
     } catch (error: any) {
+      clearAuthStorage();
+      setUser(null);
       toast.error(error.message || 'Login failed. Please check your credentials.');
       throw error;
     } finally {
@@ -68,17 +79,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    clearAuthStorage();
     setUser(null);
     toast.info('Logged out successfully');
+    if (typeof window !== 'undefined') {
+      window.location.replace('/login');
+    }
   };
 
   const refreshUser = async () => {
     try {
       const res = await api.auth.me();
-      if (res.success && res.data) setUser(res.data as User);
-    } catch {}
+      if (res.success && res.data) {
+        const nextUser = res.data as User;
+        const token = sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token') || sessionStorage.getItem('token') || localStorage.getItem('token');
+        if (token) {
+          persistAuthState(token, nextUser);
+        }
+        setUser(nextUser);
+      }
+    } catch {
+      clearAuthStorage();
+      setUser(null);
+    }
   };
 
   return (

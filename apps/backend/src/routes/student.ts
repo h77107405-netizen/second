@@ -201,6 +201,7 @@ router.get('/tests', asyncHandler(async (req, res) => {
 
 // ── Test Questions (for taking a test) ─────────────────────────────────────
 router.get('/tests/:testId/questions', asyncHandler(async (req, res) => {
+  const testId = String(req.params.testId);
   const questions = await db
     .select({
       id: schema.questions.id, questionText: schema.questions.questionText,
@@ -208,7 +209,7 @@ router.get('/tests/:testId/questions', asyncHandler(async (req, res) => {
       options: schema.questions.options, order: schema.questions.order,
     })
     .from(schema.questions)
-    .where(eq(schema.questions.testId, req.params.testId))
+    .where(eq(schema.questions.testId, testId))
     .orderBy(schema.questions.order);
   res.json({ success: true, data: questions });
 }));
@@ -217,16 +218,17 @@ router.get('/tests/:testId/questions', asyncHandler(async (req, res) => {
 router.post('/tests/:testId/submit', asyncHandler(async (req, res) => {
   const { answers } = req.body;
   const studentId = req.user!.id;
+  const testId = String(req.params.testId);
 
   const existing = await db.select().from(schema.testResults)
-    .where(and(eq(schema.testResults.testId, req.params.testId), eq(schema.testResults.studentId, studentId)))
+    .where(and(eq(schema.testResults.testId, testId), eq(schema.testResults.studentId, studentId)))
     .limit(1);
   if (existing.length) throw new ApiError(400, 'Test already submitted');
 
-  const [test] = await db.select().from(schema.tests).where(eq(schema.tests.id, req.params.testId)).limit(1);
+  const [test] = await db.select().from(schema.tests).where(eq(schema.tests.id, testId)).limit(1);
   if (!test) throw new ApiError(404, 'Test not found');
 
-  const questions = await db.select().from(schema.questions).where(eq(schema.questions.testId, req.params.testId));
+  const questions = await db.select().from(schema.questions).where(eq(schema.questions.testId, testId));
 
   let marksObtained = 0;
   for (const q of questions) {
@@ -241,7 +243,7 @@ router.post('/tests/:testId/submit', asyncHandler(async (req, res) => {
   const percentage = test.totalMarks > 0 ? (marksObtained / test.totalMarks) * 100 : 0;
 
   await db.insert(schema.testResults).values({
-    testId: req.params.testId, studentId,
+    testId, studentId,
     marksObtained: marksObtained.toString(),
     percentage: percentage.toFixed(2),
     status: 'graded',
@@ -298,15 +300,16 @@ router.get('/assignments', asyncHandler(async (req, res) => {
 }));
 
 router.post('/assignments/:id/submit', asyncHandler(async (req, res) => {
+  const assignmentId = String(req.params.id);
   const { submissionText, submissionUrl } = req.body;
   const existing = await db.select().from(schema.assignmentSubmissions)
-    .where(and(eq(schema.assignmentSubmissions.assignmentId, req.params.id), eq(schema.assignmentSubmissions.studentId, req.user!.id)))
+    .where(and(eq(schema.assignmentSubmissions.assignmentId, assignmentId), eq(schema.assignmentSubmissions.studentId, req.user!.id)))
     .limit(1);
   if (existing.length) {
     await db.update(schema.assignmentSubmissions).set({ submissionText, submissionUrl }).where(eq(schema.assignmentSubmissions.id, existing[0].id));
   } else {
     await db.insert(schema.assignmentSubmissions).values({
-      assignmentId: req.params.id, studentId: req.user!.id, submissionText, submissionUrl,
+      assignmentId, studentId: req.user!.id, submissionText, submissionUrl,
     });
   }
   res.json({ success: true, message: 'Assignment submitted' });

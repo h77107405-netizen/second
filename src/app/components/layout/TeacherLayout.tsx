@@ -52,7 +52,6 @@ export const TeacherLayout: React.FC = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
   };
 
   return (

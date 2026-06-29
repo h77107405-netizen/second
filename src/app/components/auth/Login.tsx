@@ -52,9 +52,9 @@ export const Login: React.FC = () => {
 
   const quickLogin = (role: 'student' | 'teacher' | 'admin') => {
     const credentials = {
-      student: { email: 'student@demo.com', password: 'password' },
-      teacher: { email: 'teacher@demo.com', password: 'password' },
-      admin: { email: 'admin@demo.com', password: 'password' },
+      student: { email: 'student@demo.com', password: 'Student@123' },
+      teacher: { email: 'teacher@demo.com', password: 'Teacher@123' },
+      admin: { email: 'admin@demo.com', password: 'Admin@123' },
     };
     
     setEmail(credentials[role].email);

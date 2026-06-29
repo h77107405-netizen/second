@@ -4,14 +4,20 @@ import * as schema from './schema.js';
 
 const { Pool } = pg;
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL must be set');
-}
+const connectionString = process.env.DATABASE_URL;
 
-export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-});
+const pool = connectionString
+  ? new Pool({
+      connectionString,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    })
+  : ({
+      query: async () => {
+        throw new Error('DATABASE_URL is not set');
+      },
+      end: async () => undefined,
+    } as any);
 
-export const db = drizzle(pool, { schema });
+export { pool };
+export const db = drizzle(pool as any, { schema });
 export { schema };

@@ -1,8 +1,10 @@
-export const BASE_URL =
-  import.meta.env.VITE_API_URL || "https://second-2-qx77.onrender.com/api";
+const defaultApiBase = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'https://second-2-qx77.onrender.com/api');
+
+export const BASE_URL = defaultApiBase;
 
 function getToken(): string | null {
-  return localStorage.getItem('token');
+  if (typeof window === 'undefined') return null;
+  return sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token') || sessionStorage.getItem('token') || localStorage.getItem('token');
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -13,13 +15,21 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
-  const data = await res.json();
+  const res = await fetch(`${BASE_URL}${path}`, {
+    ...options,
+    headers,
+    credentials: 'include',
+  });
+
+  const contentType = res.headers.get('content-type') || '';
+  const data = contentType.includes('application/json') ? await res.json() : await res.text();
 
   if (!res.ok) {
-    throw new Error(data.error || data.message || 'Request failed');
+    const message = typeof data === 'string' ? data : (data.error || data.message || 'Request failed');
+    throw new Error(message);
   }
-  return data;
+
+  return (typeof data === 'string' ? { message: data } : data) as T;
 }
 
 async function uploadFile(file: File): Promise<{ fileUrl: string; fileName: string; fileSize: number; mimeType: string }> {
@@ -30,9 +40,11 @@ async function uploadFile(file: File): Promise<{ fileUrl: string; fileName: stri
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: form,
+    credentials: 'include',
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Upload failed');
+  const contentType = res.headers.get('content-type') || '';
+  const data = contentType.includes('application/json') ? await res.json() : await res.text();
+  if (!res.ok) throw new Error(typeof data === 'string' ? data : data.error || 'Upload failed');
   return data.data;
 }
 
@@ -62,11 +74,12 @@ export const api = {
   // Auth
   auth: {
     login: (email: string, password: string) =>
-      request<{ success: boolean; token: string; user: any }>('/auth/login', {
+      request<{ success: boolean; token: string; refreshToken?: string; user: any }>('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       }),
     me: () => request<{ success: boolean; data: any }>('/auth/me'),
+    refresh: () => request<{ success: boolean; token?: string; user?: any }>('/auth/refresh', { method: 'POST' }),
     changePassword: (data: { currentPassword: string; newPassword: string }) =>
       request<any>('/auth/change-password', { method: 'POST', body: JSON.stringify(data) }),
     updateProfile: (data: { name?: string; phone?: string }) =>

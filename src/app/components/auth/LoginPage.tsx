@@ -24,9 +24,25 @@ export const LoginPage: React.FC = () => {
       setIsLoading(true);
       const user = await login(email, password);
 
-if (user.role === 'admin') navigate('/admin');
-if (user.role === 'teacher') navigate('/teacher');
-if (user.role === 'student') navigate('/student');
+      if (user?.role === 'admin') navigate('/admin', { replace: true });
+      if (user?.role === 'teacher') navigate('/teacher', { replace: true });
+      if (user?.role === 'student') navigate('/student', { replace: true });
+    } catch {
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleQuickLogin = async (quickEmail: string, quickPassword: string) => {
+    setEmail(quickEmail);
+    setPassword(quickPassword);
+    try {
+      setIsLoading(true);
+      const user = await login(quickEmail, quickPassword);
+
+      if (user?.role === 'admin') navigate('/admin', { replace: true });
+      if (user?.role === 'teacher') navigate('/teacher', { replace: true });
+      if (user?.role === 'student') navigate('/student', { replace: true });
     } catch {
     } finally {
       setIsLoading(false);
@@ -115,7 +131,7 @@ if (user.role === 'student') navigate('/student');
                 key={btn.email}
                 variant="outline"
                 className="w-full"
-                onClick={() => { setEmail(btn.email); setPassword(btn.password); }}
+                onClick={() => { void handleQuickLogin(btn.email, btn.password); }}
                 disabled={isLoading}
               >
                 {btn.label}

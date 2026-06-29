@@ -32,8 +32,7 @@ export async function connectDatabase() {
     console.log('✅ PostgreSQL connected successfully');
     await runMigrations();
   } catch (error) {
-    console.error('❌ Failed to connect to PostgreSQL:', error);
-    process.exit(1);
+    console.warn('⚠️ Database unavailable, continuing in degraded mode:', error instanceof Error ? error.message : error);
   }
 }
 

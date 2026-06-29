@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { eq } from 'drizzle-orm';
 import { db, schema } from '../db/index.js';
 import { comparePassword, hashPassword } from '../utils/password.js';
-import { generateToken } from '../utils/jwt.js';
+import { generateToken, generateRefreshToken, verifyToken } from '../utils/jwt.js';
 import { authenticate } from '../middleware/auth.js';
 import { asyncHandler, ApiError } from '../middleware/error.js';
 
@@ -40,10 +40,12 @@ router.post('/login', asyncHandler(async (req, res) => {
   }
 
   const token = generateToken({ id: user.id, email: user.email, role: user.role as any });
+  const refreshToken = generateRefreshToken({ id: user.id, email: user.email, role: user.role as any });
 
   res.json({
     success: true,
     token,
+    refreshToken,
     user: {
       id: user.id,
       name: user.name,
@@ -52,6 +54,30 @@ router.post('/login', asyncHandler(async (req, res) => {
       profileImage: user.profileImage,
     },
   });
+}));
+
+// POST /api/auth/refresh
+router.post('/refresh', asyncHandler(async (req, res) => {
+  const refreshToken = req.body?.refreshToken;
+  if (!refreshToken) {
+    res.status(401).json({ success: false, error: 'Refresh token required' });
+    return;
+  }
+
+  const decoded = verifyToken(refreshToken, true);
+  if (!decoded) {
+    res.status(401).json({ success: false, error: 'Invalid refresh token' });
+    return;
+  }
+
+  const [user] = await db.select({ id: schema.users.id, name: schema.users.name, email: schema.users.email, role: schema.users.role, profileImage: schema.users.profileImage, status: schema.users.status }).from(schema.users).where(eq(schema.users.id, decoded.id)).limit(1);
+  if (!user || user.status !== 'active') {
+    res.status(401).json({ success: false, error: 'Invalid refresh token' });
+    return;
+  }
+
+  const token = generateToken({ id: user.id, email: user.email, role: user.role as any });
+  res.json({ success: true, token, user });
 }));
 
 // GET /api/auth/me

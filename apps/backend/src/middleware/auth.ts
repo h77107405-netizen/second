@@ -4,7 +4,7 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/jwt.js';
-import type { AuthUser, UserRole } from '../../../packages/shared-types/src/index.js';
+import type { AuthUser, UserRole } from '../../../../packages/shared-types/src/index';
 
 // Extend Express Request to include user
 declare global {

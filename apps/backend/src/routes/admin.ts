@@ -107,7 +107,7 @@ router.post('/students', asyncHandler(async (req, res) => {
 }));
 
 router.put('/students/:id', asyncHandler(async (req, res) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const { name, phone, status, parentName, parentPhone, address, courseId } = req.body;
   await db.update(schema.users).set({ name, phone, status, updatedAt: new Date() }).where(eq(schema.users.id, id));
   await db.update(schema.studentProfiles).set({ parentName, parentPhone, address, courseId }).where(eq(schema.studentProfiles.userId, id));
@@ -115,8 +115,9 @@ router.put('/students/:id', asyncHandler(async (req, res) => {
 }));
 
 router.delete('/students/:id', asyncHandler(async (req, res) => {
-  await db.delete(schema.users).where(and(eq(schema.users.id, req.params.id), eq(schema.users.role, 'student')));
-  await logAudit(req.user!.id, req.user!.role, 'DELETE', 'student', req.params.id, undefined, req.ip);
+  const id = String(req.params.id);
+  await db.delete(schema.users).where(and(eq(schema.users.id, id), eq(schema.users.role, 'student')));
+  await logAudit(req.user!.id, req.user!.role, 'DELETE', 'student', id, undefined, req.ip);
   res.json({ success: true, message: 'Student deleted' });
 }));
 
@@ -191,7 +192,7 @@ router.post('/teachers', asyncHandler(async (req, res) => {
 }));
 
 router.put('/teachers/:id', asyncHandler(async (req, res) => {
-  const { id } = req.params;
+  const id = String(req.params.id);
   const { name, phone, status, qualification, experience, specialization } = req.body;
   await db.update(schema.users).set({ name, phone, status, updatedAt: new Date() }).where(eq(schema.users.id, id));
   await db.update(schema.teacherProfiles).set({ qualification, experience, specialization }).where(eq(schema.teacherProfiles.userId, id));
@@ -199,8 +200,9 @@ router.put('/teachers/:id', asyncHandler(async (req, res) => {
 }));
 
 router.delete('/teachers/:id', asyncHandler(async (req, res) => {
-  await db.delete(schema.users).where(and(eq(schema.users.id, req.params.id), eq(schema.users.role, 'teacher')));
-  await logAudit(req.user!.id, req.user!.role, 'DELETE', 'teacher', req.params.id, undefined, req.ip);
+  const id = String(req.params.id);
+  await db.delete(schema.users).where(and(eq(schema.users.id, id), eq(schema.users.role, 'teacher')));
+  await logAudit(req.user!.id, req.user!.role, 'DELETE', 'teacher', id, undefined, req.ip);
   res.json({ success: true, message: 'Teacher deleted' });
 }));
 
@@ -239,14 +241,16 @@ router.post('/courses', asyncHandler(async (req, res) => {
 }));
 
 router.put('/courses/:id', asyncHandler(async (req, res) => {
+  const id = String(req.params.id);
   const { name, description, classLevel, duration, fee, status } = req.body;
-  await db.update(schema.courses).set({ name, description, classLevel, duration, fee: fee?.toString(), status, updatedAt: new Date() }).where(eq(schema.courses.id, req.params.id));
+  await db.update(schema.courses).set({ name, description, classLevel, duration, fee: fee?.toString(), status, updatedAt: new Date() }).where(eq(schema.courses.id, id));
   res.json({ success: true, message: 'Course updated' });
 }));
 
 router.delete('/courses/:id', asyncHandler(async (req, res) => {
-  await db.delete(schema.courses).where(eq(schema.courses.id, req.params.id));
-  await logAudit(req.user!.id, req.user!.role, 'DELETE', 'course', req.params.id, undefined, req.ip);
+  const id = String(req.params.id);
+  await db.delete(schema.courses).where(eq(schema.courses.id, id));
+  await logAudit(req.user!.id, req.user!.role, 'DELETE', 'course', id, undefined, req.ip);
   res.json({ success: true, message: 'Course deleted' });
 }));
 
@@ -307,60 +311,69 @@ router.post('/batches', asyncHandler(async (req, res) => {
 
 router.put('/batches/:id', asyncHandler(async (req, res) => {
   const { name, timing, startDate, endDate, description, status } = req.body;
-  await db.update(schema.batches).set({ name, timing, startDate, endDate, description, status, updatedAt: new Date() }).where(eq(schema.batches.id, req.params.id));
+  const batchId = String(req.params.id);
+  await db.update(schema.batches).set({ name, timing, startDate, endDate, description, status, updatedAt: new Date() }).where(eq(schema.batches.id, batchId));
   res.json({ success: true, message: 'Batch updated' });
 }));
 
 router.delete('/batches/:id', asyncHandler(async (req, res) => {
-  await db.delete(schema.batches).where(eq(schema.batches.id, req.params.id));
-  await logAudit(req.user!.id, req.user!.role, 'DELETE', 'batch', req.params.id, undefined, req.ip);
+  const batchId = String(req.params.id);
+  await db.delete(schema.batches).where(eq(schema.batches.id, batchId));
+  await logAudit(req.user!.id, req.user!.role, 'DELETE', 'batch', batchId, undefined, req.ip);
   res.json({ success: true, message: 'Batch deleted' });
 }));
 
 // ── Batch Members ───────────────────────────────────────────────────────────
 router.get('/batches/:id/members', asyncHandler(async (req, res) => {
+  const batchId = String(req.params.id);
   const [teachers, students] = await Promise.all([
     db.select({ id: schema.users.id, name: schema.users.name, email: schema.users.email, phone: schema.users.phone })
       .from(schema.batchTeachers)
       .innerJoin(schema.users, eq(schema.batchTeachers.teacherId, schema.users.id))
-      .where(eq(schema.batchTeachers.batchId, req.params.id)),
+      .where(eq(schema.batchTeachers.batchId, batchId)),
     db.select({ id: schema.users.id, name: schema.users.name, email: schema.users.email, phone: schema.users.phone })
       .from(schema.batchStudents)
       .innerJoin(schema.users, eq(schema.batchStudents.studentId, schema.users.id))
-      .where(eq(schema.batchStudents.batchId, req.params.id)),
+      .where(eq(schema.batchStudents.batchId, batchId)),
   ]);
   res.json({ success: true, data: { teachers, students } });
 }));
 
 router.post('/batches/:id/teachers', asyncHandler(async (req, res) => {
   const { teacherId } = req.body;
+  const batchId = String(req.params.id);
   if (!teacherId) throw new ApiError(400, 'teacherId is required');
   const existing = await db.select().from(schema.batchTeachers)
-    .where(and(eq(schema.batchTeachers.batchId, req.params.id), eq(schema.batchTeachers.teacherId, teacherId))).limit(1);
+    .where(and(eq(schema.batchTeachers.batchId, batchId), eq(schema.batchTeachers.teacherId, teacherId))).limit(1);
   if (existing.length) throw new ApiError(409, 'Teacher already in this batch');
-  await db.insert(schema.batchTeachers).values({ batchId: req.params.id, teacherId });
+  await db.insert(schema.batchTeachers).values({ batchId, teacherId });
   res.json({ success: true, message: 'Teacher added to batch' });
 }));
 
 router.delete('/batches/:id/teachers/:teacherId', asyncHandler(async (req, res) => {
+  const batchId = String(req.params.id);
+  const teacherId = String(req.params.teacherId);
   await db.delete(schema.batchTeachers)
-    .where(and(eq(schema.batchTeachers.batchId, req.params.id), eq(schema.batchTeachers.teacherId, req.params.teacherId)));
+    .where(and(eq(schema.batchTeachers.batchId, batchId), eq(schema.batchTeachers.teacherId, teacherId)));
   res.json({ success: true, message: 'Teacher removed from batch' });
 }));
 
 router.post('/batches/:id/students', asyncHandler(async (req, res) => {
   const { studentId } = req.body;
+  const batchId = String(req.params.id);
   if (!studentId) throw new ApiError(400, 'studentId is required');
   const existing = await db.select().from(schema.batchStudents)
-    .where(and(eq(schema.batchStudents.batchId, req.params.id), eq(schema.batchStudents.studentId, studentId))).limit(1);
+    .where(and(eq(schema.batchStudents.batchId, batchId), eq(schema.batchStudents.studentId, studentId))).limit(1);
   if (existing.length) throw new ApiError(409, 'Student already in this batch');
-  await db.insert(schema.batchStudents).values({ batchId: req.params.id, studentId });
+  await db.insert(schema.batchStudents).values({ batchId, studentId });
   res.json({ success: true, message: 'Student added to batch' });
 }));
 
 router.delete('/batches/:id/students/:studentId', asyncHandler(async (req, res) => {
+  const batchId = String(req.params.id);
+  const studentId = String(req.params.studentId);
   await db.delete(schema.batchStudents)
-    .where(and(eq(schema.batchStudents.batchId, req.params.id), eq(schema.batchStudents.studentId, req.params.studentId)));
+    .where(and(eq(schema.batchStudents.batchId, batchId), eq(schema.batchStudents.studentId, studentId)));
   res.json({ success: true, message: 'Student removed from batch' });
 }));
 
@@ -406,8 +419,9 @@ router.post('/materials', asyncHandler(async (req, res) => {
 }));
 
 router.delete('/materials/:id', asyncHandler(async (req, res) => {
-  await db.delete(schema.materials).where(eq(schema.materials.id, req.params.id));
-  await logAudit(req.user!.id, req.user!.role, 'DELETE', 'material', req.params.id, undefined, req.ip);
+  const materialId = String(req.params.id);
+  await db.delete(schema.materials).where(eq(schema.materials.id, materialId));
+  await logAudit(req.user!.id, req.user!.role, 'DELETE', 'material', materialId, undefined, req.ip);
   res.json({ success: true, message: 'Material deleted' });
 }));
 
@@ -491,9 +505,10 @@ router.get('/tests', asyncHandler(async (req, res) => {
 }));
 
 router.get('/tests/:testId/results', asyncHandler(async (req, res) => {
+  const testId = String(req.params.testId);
   const [test] = await db
     .select({ id: schema.tests.id, title: schema.tests.title, totalMarks: schema.tests.totalMarks, passingMarks: schema.tests.passingMarks })
-    .from(schema.tests).where(eq(schema.tests.id, req.params.testId)).limit(1);
+    .from(schema.tests).where(eq(schema.tests.id, testId)).limit(1);
   if (!test) throw new ApiError(404, 'Test not found');
 
   const results = await db
@@ -505,7 +520,7 @@ router.get('/tests/:testId/results', asyncHandler(async (req, res) => {
     })
     .from(schema.testResults)
     .leftJoin(schema.users, eq(schema.testResults.studentId, schema.users.id))
-    .where(eq(schema.testResults.testId, req.params.testId))
+    .where(eq(schema.testResults.testId, testId))
     .orderBy(desc(schema.testResults.submittedAt));
 
   res.json({ success: true, data: results, test });
@@ -569,7 +584,8 @@ router.post('/fees', asyncHandler(async (req, res) => {
 
 router.post('/fees/:feeId/payments', asyncHandler(async (req, res) => {
   const { amount, paymentMode, transactionId, receiptNumber, notes } = req.body;
-  const [fee] = await db.select().from(schema.fees).where(eq(schema.fees.id, req.params.feeId)).limit(1);
+  const feeId = String(req.params.feeId);
+  const [fee] = await db.select().from(schema.fees).where(eq(schema.fees.id, feeId)).limit(1);
   if (!fee) throw new ApiError(404, 'Fee record not found');
   const [payment] = await db.insert(schema.payments).values({
     feeId: fee.id, studentId: fee.studentId, amount: amount.toString(),
@@ -590,6 +606,7 @@ router.post('/fees/:feeId/payments', asyncHandler(async (req, res) => {
 }));
 
 router.get('/fees/:feeId/receipt', asyncHandler(async (req, res) => {
+  const feeId = String(req.params.feeId);
   const [fee] = await db
     .select({
       id: schema.fees.id, totalAmount: schema.fees.totalAmount, discount: schema.fees.discount,
@@ -599,63 +616,71 @@ router.get('/fees/:feeId/receipt', asyncHandler(async (req, res) => {
     .from(schema.fees)
     .leftJoin(schema.courses, eq(schema.fees.courseId, schema.courses.id))
     .leftJoin(schema.users, eq(schema.fees.studentId, schema.users.id))
-    .where(eq(schema.fees.id, req.params.feeId)).limit(1);
+    .where(eq(schema.fees.id, feeId)).limit(1);
   if (!fee) throw new ApiError(404, 'Fee not found');
-  const payments = await db.select().from(schema.payments).where(eq(schema.payments.feeId, req.params.feeId)).orderBy(desc(schema.payments.paidAt));
+  const payments = await db.select().from(schema.payments).where(eq(schema.payments.feeId, feeId)).orderBy(desc(schema.payments.paidAt));
   res.json({ success: true, data: { fee, payments } });
 }));
 
 // ── Subjects (per course) ───────────────────────────────────────────────────
 router.get('/courses/:courseId/subjects', asyncHandler(async (req, res) => {
-  const data = await db.select().from(schema.subjects).where(eq(schema.subjects.courseId, req.params.courseId)).orderBy(schema.subjects.order);
+  const courseId = String(req.params.courseId);
+  const data = await db.select().from(schema.subjects).where(eq(schema.subjects.courseId, courseId)).orderBy(schema.subjects.order);
   res.json({ success: true, data });
 }));
 
 router.post('/courses/:courseId/subjects', asyncHandler(async (req, res) => {
+  const courseId = String(req.params.courseId);
   const { name, description } = req.body;
   if (!name) throw new ApiError(400, 'name is required');
-  const existing = await db.select({ order: schema.subjects.order }).from(schema.subjects).where(eq(schema.subjects.courseId, req.params.courseId)).orderBy(desc(schema.subjects.order)).limit(1);
+  const existing = await db.select({ order: schema.subjects.order }).from(schema.subjects).where(eq(schema.subjects.courseId, courseId)).orderBy(desc(schema.subjects.order)).limit(1);
   const order = existing.length ? (existing[0].order ?? 0) + 1 : 1;
-  const [sub] = await db.insert(schema.subjects).values({ courseId: req.params.courseId, name, description, order }).returning();
+  const [sub] = await db.insert(schema.subjects).values({ courseId, name, description, order }).returning();
   await logAudit(req.user!.id, req.user!.role, 'CREATE', 'subject', sub.id, name, req.ip);
   res.status(201).json({ success: true, data: sub });
 }));
 
 router.put('/courses/:courseId/subjects/:subId', asyncHandler(async (req, res) => {
+  const subId = String(req.params.subId);
   const { name, description } = req.body;
-  await db.update(schema.subjects).set({ name, description }).where(eq(schema.subjects.id, req.params.subId));
+  await db.update(schema.subjects).set({ name, description }).where(eq(schema.subjects.id, subId));
   res.json({ success: true, message: 'Subject updated' });
 }));
 
 router.delete('/courses/:courseId/subjects/:subId', asyncHandler(async (req, res) => {
-  await db.delete(schema.subjects).where(eq(schema.subjects.id, req.params.subId));
-  await logAudit(req.user!.id, req.user!.role, 'DELETE', 'subject', req.params.subId, undefined, req.ip);
+  const subId = String(req.params.subId);
+  await db.delete(schema.subjects).where(eq(schema.subjects.id, subId));
+  await logAudit(req.user!.id, req.user!.role, 'DELETE', 'subject', subId, undefined, req.ip);
   res.json({ success: true, message: 'Subject deleted' });
 }));
 
 // ── Chapters (per subject) ──────────────────────────────────────────────────
 router.get('/subjects/:subjectId/chapters', asyncHandler(async (req, res) => {
-  const data = await db.select().from(schema.chapters).where(eq(schema.chapters.subjectId, req.params.subjectId)).orderBy(schema.chapters.order);
+  const subjectId = String(req.params.subjectId);
+  const data = await db.select().from(schema.chapters).where(eq(schema.chapters.subjectId, subjectId)).orderBy(schema.chapters.order);
   res.json({ success: true, data });
 }));
 
 router.post('/subjects/:subjectId/chapters', asyncHandler(async (req, res) => {
+  const subjectId = String(req.params.subjectId);
   const { title, description, videoUrl, duration } = req.body;
   if (!title) throw new ApiError(400, 'title is required');
-  const existing = await db.select({ order: schema.chapters.order }).from(schema.chapters).where(eq(schema.chapters.subjectId, req.params.subjectId)).orderBy(desc(schema.chapters.order)).limit(1);
+  const existing = await db.select({ order: schema.chapters.order }).from(schema.chapters).where(eq(schema.chapters.subjectId, subjectId)).orderBy(desc(schema.chapters.order)).limit(1);
   const order = existing.length ? (existing[0].order ?? 0) + 1 : 1;
-  const [ch] = await db.insert(schema.chapters).values({ subjectId: req.params.subjectId, title, description, videoUrl, duration: duration ? parseInt(duration) : null, order }).returning();
+  const [ch] = await db.insert(schema.chapters).values({ subjectId, title, description, videoUrl, duration: duration ? parseInt(duration) : null, order }).returning();
   res.status(201).json({ success: true, data: ch });
 }));
 
 router.put('/subjects/:subjectId/chapters/:chapterId', asyncHandler(async (req, res) => {
+  const chapterId = String(req.params.chapterId);
   const { title, description, videoUrl, duration } = req.body;
-  await db.update(schema.chapters).set({ title, description, videoUrl, duration: duration ? parseInt(duration) : null }).where(eq(schema.chapters.id, req.params.chapterId));
+  await db.update(schema.chapters).set({ title, description, videoUrl, duration: duration ? parseInt(duration) : null }).where(eq(schema.chapters.id, chapterId));
   res.json({ success: true, message: 'Chapter updated' });
 }));
 
 router.delete('/subjects/:subjectId/chapters/:chapterId', asyncHandler(async (req, res) => {
-  await db.delete(schema.chapters).where(eq(schema.chapters.id, req.params.chapterId));
+  const chapterId = String(req.params.chapterId);
+  await db.delete(schema.chapters).where(eq(schema.chapters.id, chapterId));
   res.json({ success: true, message: 'Chapter deleted' });
 }));
 
@@ -666,9 +691,10 @@ router.post('/notifications/broadcast', asyncHandler(async (req, res) => {
 
   let targetUsers: { id: string }[] = [];
   if (batchId) {
-    const students = await db.select({ id: schema.batchStudents.studentId }).from(schema.batchStudents).where(eq(schema.batchStudents.batchId, batchId));
-    const teachers = await db.select({ id: schema.batchTeachers.teacherId }).from(schema.batchTeachers).where(eq(schema.batchTeachers.batchId, batchId));
-    targetUsers = [...students.map(s => ({ id: s.studentId })), ...teachers.map(t => ({ id: t.teacherId }))];
+    const batchIdValue = String(batchId);
+    const students = await db.select({ id: schema.batchStudents.studentId }).from(schema.batchStudents).where(eq(schema.batchStudents.batchId, batchIdValue));
+    const teachers = await db.select({ id: schema.batchTeachers.teacherId }).from(schema.batchTeachers).where(eq(schema.batchTeachers.batchId, batchIdValue));
+    targetUsers = [...students.map(s => ({ id: s.id })), ...teachers.map(t => ({ id: t.id }))];
   } else if (targetRole) {
     targetUsers = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.role, targetRole));
   } else {

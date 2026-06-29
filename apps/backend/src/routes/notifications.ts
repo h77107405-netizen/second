@@ -67,11 +67,12 @@ router.get('/unread-count', asyncHandler(async (req, res) => {
 }));
 
 router.patch('/:id/read', asyncHandler(async (req, res) => {
+  const notificationId = String(req.params.id);
   await db
     .update(schema.notifications)
     .set({ isRead: true })
     .where(and(
-      eq(schema.notifications.id, req.params.id),
+      eq(schema.notifications.id, notificationId),
       eq(schema.notifications.receiverId, req.user!.id),
     ));
   res.json({ success: true, message: 'Marked as read' });

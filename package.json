@@ -4,9 +4,9 @@
   "version": "0.0.1",
   "type": "module",
   "packageManager": "pnpm@8.8.0",
-"engines": {
-  "node": "20.x"
-},
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "build": "vite build && node scripts/generate-precache.cjs",
     "dev": "concurrently --kill-others \"npm run dev:frontend\" \"npm run dev:backend\"",
@@ -99,6 +99,7 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.12",
     "@vitejs/plugin-react": "^4.7.0",
+    "express-validator": "^7.3.2",
     "tailwindcss": "^4.1.12",
     "vite": "^6.3.5"
   }

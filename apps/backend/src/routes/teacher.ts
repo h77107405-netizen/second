@@ -135,15 +135,16 @@ router.post('/live-classes', asyncHandler(async (req, res) => {
 
 router.put('/live-classes/:id', asyncHandler(async (req, res) => {
   const { title, description, meetingLink, scheduledDate, scheduledTime, duration, status } = req.body;
+  const classId = String(req.params.id);
   const [prev] = await db.select({ status: schema.liveClasses.status, batchId: schema.liveClasses.batchId, title: schema.liveClasses.title })
     .from(schema.liveClasses)
-    .where(and(eq(schema.liveClasses.id, req.params.id), eq(schema.liveClasses.teacherId, req.user!.id))).limit(1);
+    .where(and(eq(schema.liveClasses.id, classId), eq(schema.liveClasses.teacherId, req.user!.id))).limit(1);
 
   await db.update(schema.liveClasses).set({
     title, description, meetingLink,
     scheduledDate: scheduledDate ? new Date(scheduledDate) : undefined,
     scheduledTime, duration, status, updatedAt: new Date(),
-  }).where(and(eq(schema.liveClasses.id, req.params.id), eq(schema.liveClasses.teacherId, req.user!.id)));
+  }).where(and(eq(schema.liveClasses.id, classId), eq(schema.liveClasses.teacherId, req.user!.id)));
 
   // SSE: notify batch students when class goes live
   if (status === 'live' && prev?.status !== 'live' && prev?.batchId) {
@@ -171,7 +172,8 @@ router.put('/live-classes/:id', asyncHandler(async (req, res) => {
 }));
 
 router.delete('/live-classes/:id', asyncHandler(async (req, res) => {
-  await db.delete(schema.liveClasses).where(and(eq(schema.liveClasses.id, req.params.id), eq(schema.liveClasses.teacherId, req.user!.id)));
+  const classId = String(req.params.id);
+  await db.delete(schema.liveClasses).where(and(eq(schema.liveClasses.id, classId), eq(schema.liveClasses.teacherId, req.user!.id)));
   res.json({ success: true, message: 'Class deleted' });
 }));
 
@@ -213,14 +215,15 @@ router.post('/tests', asyncHandler(async (req, res) => {
 
 router.put('/tests/:id', asyncHandler(async (req, res) => {
   const { title, description, status, startDate, endDate } = req.body;
+  const testId = String(req.params.id);
 
   // Fetch current test to detect publish transition
   const [currentTest] = await db.select().from(schema.tests)
-    .where(and(eq(schema.tests.id, req.params.id), eq(schema.tests.teacherId, req.user!.id))).limit(1);
+    .where(and(eq(schema.tests.id, testId), eq(schema.tests.teacherId, req.user!.id))).limit(1);
   if (!currentTest) throw new ApiError(404, 'Test not found');
 
   await db.update(schema.tests).set({ title, description, status, startDate, endDate, updatedAt: new Date() })
-    .where(eq(schema.tests.id, req.params.id));
+    .where(eq(schema.tests.id, testId));
 
   // If publishing for the first time, notify all students in the batch
   if (status === 'published' && currentTest.status !== 'published' && currentTest.batchId) {
@@ -276,8 +279,9 @@ router.post('/assignments', asyncHandler(async (req, res) => {
 
 // ── Assignment Submissions / Grading ───────────────────────────────────────
 router.get('/assignments/:id/submissions', asyncHandler(async (req, res) => {
+  const assignmentId = String(req.params.id);
   const [assignment] = await db.select().from(schema.assignments)
-    .where(and(eq(schema.assignments.id, req.params.id), eq(schema.assignments.teacherId, req.user!.id))).limit(1);
+    .where(and(eq(schema.assignments.id, assignmentId), eq(schema.assignments.teacherId, req.user!.id))).limit(1);
   if (!assignment) throw new ApiError(404, 'Assignment not found');
 
   const data = await db
@@ -296,7 +300,7 @@ router.get('/assignments/:id/submissions', asyncHandler(async (req, res) => {
     })
     .from(schema.assignmentSubmissions)
     .leftJoin(schema.users, eq(schema.assignmentSubmissions.studentId, schema.users.id))
-    .where(eq(schema.assignmentSubmissions.assignmentId, req.params.id))
+    .where(eq(schema.assignmentSubmissions.assignmentId, assignmentId))
     .orderBy(desc(schema.assignmentSubmissions.submittedAt));
 
   res.json({ success: true, data, assignment });
@@ -304,19 +308,21 @@ router.get('/assignments/:id/submissions', asyncHandler(async (req, res) => {
 
 router.patch('/assignments/:id/submissions/:submissionId/grade', asyncHandler(async (req, res) => {
   const { marksAwarded, feedback } = req.body;
+  const assignmentId = String(req.params.id);
+  const submissionId = String(req.params.submissionId);
   if (marksAwarded === undefined) throw new ApiError(400, 'marksAwarded is required');
 
   const [assignment] = await db.select().from(schema.assignments)
-    .where(and(eq(schema.assignments.id, req.params.id), eq(schema.assignments.teacherId, req.user!.id))).limit(1);
+    .where(and(eq(schema.assignments.id, assignmentId), eq(schema.assignments.teacherId, req.user!.id))).limit(1);
   if (!assignment) throw new ApiError(403, 'Not your assignment');
 
   const [submission] = await db.select({ studentId: schema.assignmentSubmissions.studentId })
-    .from(schema.assignmentSubmissions).where(eq(schema.assignmentSubmissions.id, req.params.submissionId)).limit(1);
+    .from(schema.assignmentSubmissions).where(eq(schema.assignmentSubmissions.id, submissionId)).limit(1);
 
   await db.update(schema.assignmentSubmissions).set({
     marksAwarded: parseInt(marksAwarded), feedback, status: 'graded',
     gradedAt: new Date(), gradedBy: req.user!.id,
-  }).where(eq(schema.assignmentSubmissions.id, req.params.submissionId));
+  }).where(eq(schema.assignmentSubmissions.id, submissionId));
 
   // Notify student of graded assignment
   if (submission?.studentId) {
@@ -347,18 +353,19 @@ router.get('/doubts', asyncHandler(async (req, res) => {
 
 router.post('/doubts/:id/reply', asyncHandler(async (req, res) => {
   const { reply } = req.body;
+  const doubtId = String(req.params.id);
   if (!reply) throw new ApiError(400, 'reply is required');
 
   // Fetch the doubt to get the student's id and question preview
   const [doubt] = await db
     .select({ studentId: schema.doubts.studentId, question: schema.doubts.question })
     .from(schema.doubts)
-    .where(eq(schema.doubts.id, req.params.id));
+    .where(eq(schema.doubts.id, doubtId));
 
   if (!doubt) throw new ApiError(404, 'Doubt not found');
 
-  await db.insert(schema.doubtReplies).values({ doubtId: req.params.id, teacherId: req.user!.id, reply });
-  await db.update(schema.doubts).set({ status: 'answered', updatedAt: new Date() }).where(eq(schema.doubts.id, req.params.id));
+  await db.insert(schema.doubtReplies).values({ doubtId, teacherId: req.user!.id, reply });
+  await db.update(schema.doubts).set({ status: 'answered', updatedAt: new Date() }).where(eq(schema.doubts.id, doubtId));
 
   // Persist a notification record so the student sees it in the bell
   const questionPreview = doubt.question.length > 60 ? doubt.question.slice(0, 60) + '…' : doubt.question;
@@ -376,7 +383,7 @@ router.post('/doubts/:id/reply', asyncHandler(async (req, res) => {
     title: notif.title,
     message: notif.message,
     type: 'doubt',
-    doubtId: req.params.id,
+    doubtId,
     createdAt: notif.createdAt,
     isRead: false,
   });
@@ -386,17 +393,19 @@ router.post('/doubts/:id/reply', asyncHandler(async (req, res) => {
 
 // ── Test Questions ─────────────────────────────────────────────────────────
 router.get('/tests/:id/questions', asyncHandler(async (req, res) => {
-  const data = await db.select().from(schema.questions).where(eq(schema.questions.testId, req.params.id)).orderBy(schema.questions.order);
+  const testId = String(req.params.id);
+  const data = await db.select().from(schema.questions).where(eq(schema.questions.testId, testId)).orderBy(schema.questions.order);
   res.json({ success: true, data });
 }));
 
 router.post('/tests/:id/questions', asyncHandler(async (req, res) => {
   const { questions: qs } = req.body;
+  const testId = String(req.params.id);
   if (!qs?.length) throw new ApiError(400, 'questions array is required');
-  await db.delete(schema.questions).where(eq(schema.questions.testId, req.params.id));
+  await db.delete(schema.questions).where(eq(schema.questions.testId, testId));
   const inserted = await db.insert(schema.questions).values(
     qs.map((q: any, i: number) => ({
-      testId: req.params.id,
+      testId,
       questionText: q.questionText,
       questionType: q.questionType || 'mcq',
       marks: parseInt(q.marks || '1'),
@@ -486,7 +495,7 @@ router.get('/analytics', asyncHandler(async (req, res) => {
 
 // ── Student Progress (per batch) ───────────────────────────────────────────
 router.get('/batches/:batchId/students/progress', asyncHandler(async (req, res) => {
-  const { batchId } = req.params;
+  const batchId = String(req.params.batchId);
 
   // Verify teacher belongs to this batch
   const [membership] = await db.select().from(schema.batchTeachers)
@@ -574,6 +583,7 @@ router.get('/batches/:batchId/students/progress', asyncHandler(async (req, res) 
 
 // ── Test Results ───────────────────────────────────────────────────────────
 router.get('/tests/:testId/results', asyncHandler(async (req, res) => {
+  const testId = String(req.params.testId);
   const data = await db
     .select({
       id: schema.testResults.id, marksObtained: schema.testResults.marksObtained,
@@ -582,7 +592,7 @@ router.get('/tests/:testId/results', asyncHandler(async (req, res) => {
     })
     .from(schema.testResults)
     .leftJoin(schema.users, eq(schema.testResults.studentId, schema.users.id))
-    .where(eq(schema.testResults.testId, req.params.testId))
+    .where(eq(schema.testResults.testId, testId))
     .orderBy(desc(schema.testResults.submittedAt));
   res.json({ success: true, data });
 }));
@@ -650,7 +660,7 @@ router.get('/attendance/sessions', asyncHandler(async (req, res) => {
 
 // Get single session with all records
 router.get('/attendance/sessions/:sessionId', asyncHandler(async (req, res) => {
-  const { sessionId } = req.params;
+  const sessionId = String(req.params.sessionId);
   const [session] = await db.select().from(schema.attendanceSessions).where(eq(schema.attendanceSessions.id, sessionId)).limit(1);
   if (!session) throw new ApiError(404, 'Session not found');
 
@@ -675,7 +685,7 @@ router.get('/attendance/sessions/:sessionId', asyncHandler(async (req, res) => {
 
 // Update attendance records for a session
 router.put('/attendance/sessions/:sessionId', asyncHandler(async (req, res) => {
-  const { sessionId } = req.params;
+  const sessionId = String(req.params.sessionId);
   const { records } = req.body as { records: { studentId: string; status: 'present' | 'absent' | 'late'; note?: string }[] };
   if (!records || !Array.isArray(records)) throw new ApiError(400, 'records array is required');
 
@@ -698,7 +708,7 @@ router.put('/attendance/sessions/:sessionId', asyncHandler(async (req, res) => {
 
 // Delete a session
 router.delete('/attendance/sessions/:sessionId', asyncHandler(async (req, res) => {
-  const { sessionId } = req.params;
+  const sessionId = String(req.params.sessionId);
   const [session] = await db.select().from(schema.attendanceSessions).where(eq(schema.attendanceSessions.id, sessionId)).limit(1);
   if (!session) throw new ApiError(404, 'Session not found');
 
