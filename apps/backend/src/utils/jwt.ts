@@ -2,7 +2,7 @@
 // JWT UTILITIES
 // ============================================
 
-import * as jwt from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import { config } from '../config/env.js';
 import type { AuthUser } from '../../../../packages/shared-types/src/index';
 
